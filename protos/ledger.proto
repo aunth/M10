@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package m10.ledger;
+
+message Transfer {
+  bytes from_account = 1;
+  bytes to_account = 2;
+  uint64 amount = 3;
+}
+
+message TransferError {
+  Code code = 1;
+  string message = 2;
+  enum Code {
+
+      UNKNOWN = 0;
+      INSUFFICIENT_BALANCE = 1;
+    }
+}
+
+message TransferResult {
+  TransferError error = 1;
+}
+
+
+message CreateAccountReq {
+  string name = 1;
+  uint64 balance = 2;
+}
+
+message GetAccountReq {
+  bytes id = 1;
+}
+
+message Account {
+  bytes id = 1;
+  string name = 2;
+  uint64 balance = 3;
+}
+
+service Ledger {
+  rpc CreateAccount(CreateAccountReq) returns (Account) {}
+  rpc GetAccount(GetAccountReq) returns (Account) {}
+
+  rpc CreateTransfer(Transfer) returns (TransferResult) {}
+}
