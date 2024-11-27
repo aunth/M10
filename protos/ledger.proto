@@ -12,7 +12,6 @@ message TransferError {
   Code code = 1;
   string message = 2;
   enum Code {
-
       UNKNOWN = 0;
       INSUFFICIENT_BALANCE = 1;
     }
@@ -36,6 +35,25 @@ message Account {
   bytes id = 1;
   string name = 2;
   uint64 balance = 3;
+  bool is_frozen = 4;
+}
+
+message FreezeAccountRequest {
+  bytes id = 1;
+}
+
+message FreezeAccountResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UnfreezeAccountRequest {
+  bytes id = 1;
+}
+
+message UnfreezeAccountResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 service Ledger {
@@ -43,4 +61,6 @@ service Ledger {
   rpc GetAccount(GetAccountReq) returns (Account) {}
 
   rpc CreateTransfer(Transfer) returns (TransferResult) {}
+  rpc FreezeAccount(FreezeAccountRequest) returns (FreezeAccountResponse) {}
+  rpc UnfreezeAccount(UnfreezeAccountRequest) returns (UnfreezeAccountResponse) {}
 }
