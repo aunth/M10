@@ -1,5 +1,4 @@
 use std::{collections::HashMap, sync::Arc};
-
 use async_trait::async_trait;
 use protos::{ledger_server::LedgerServer, transfer_error, Account, TransferError, TransferResult};
 use tokio::sync::Mutex;
@@ -25,6 +24,50 @@ struct Ledger {
 
 #[async_trait]
 impl protos::ledger_server::Ledger for Ledger {
+    async fn freeze_account(
+        &self,
+        request: tonic::Request<protos::FreezeAccountRequest>,
+    ) -> Result<tonic::Response<protos::FreezeAccountResponse>, tonic::Status> {
+        let request = request.into_inner();
+        let id = Uuid::from_slice(&request.id)
+            .map_err(|err| tonic::Status::invalid_argument(format!("{}", err)))?;
+        let mut accounts = self.accounts.lock().await;
+        let account = accounts.get_mut(&id).ok_or_else(|| Status::not_found("account not found"))?;
+        if account.is_frozen {
+            return Ok(tonic::Response::new(protos::FreezeAccountResponse {
+                success: false,
+                message: "account is already frozen".to_string(),
+            }));
+        }
+        account.is_frozen = true;
+        Ok(tonic::Response::new(protos::FreezeAccountResponse {
+            success: true,
+            message: "Account has been frozen".to_string(),
+        }))
+    }
+
+    async fn unfreeze_account(
+        &self,
+        request: tonic::Request<protos::UnfreezeAccountRequest>,
+    ) -> Result<tonic::Response<protos::UnfreezeAccountResponse>, tonic::Status> {
+        let request = request.into_inner();
+        let id = Uuid::from_slice(&request.id)
+            .map_err(|err| tonic::Status::invalid_argument(format!("{}", err)))?;
+        let mut accounts = self.accounts.lock().await;
+        let account = accounts.get_mut(&id).ok_or_else(|| Status::not_found("account not found"))?;
+        if !account.is_frozen {
+            return Ok(tonic::Response::new(protos::UnfreezeAccountResponse {
+                success: false,
+                message: "account is not frozen".to_string(),
+            }));
+        }
+        account.is_frozen = false;
+        Ok(tonic::Response::new(protos::UnfreezeAccountResponse {
+            success: true,
+            message: "account has been unfrozen".to_string(),
+        }))
+    }
+
     async fn create_account(
         &self,
         request: tonic::Request<protos::CreateAccountReq>,
@@ -36,6 +79,7 @@ impl protos::ledger_server::Ledger for Ledger {
             name: request.name,
             balance: request.balance,
             id: id.as_bytes().to_vec(),
+            is_frozen: false,
         };
         accounts.insert(id, account.clone());
         Ok(tonic::Response::new(account))
