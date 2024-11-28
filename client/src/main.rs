@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer};
+use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer, FreezeAccountRequest, UnfreezeAccountRequest};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -23,6 +23,12 @@ enum Cmd {
         from: uuid::Uuid,
         to: uuid::Uuid,
         amount: u64,
+    },
+    Freeze {
+        id: uuid::Uuid,
+    },
+    Unfreeze {
+        id: uuid::Uuid,
     },
 }
 
@@ -57,6 +63,14 @@ impl Cmd {
                     })
                     .await?
                     .into_inner();
+                println!("{:#?}", resp);
+            }
+            Cmd::Freeze { id } => {
+                let resp = client.freeze_account(FreezeAccountRequest { id: id.as_bytes().to_vec() }).await?.into_inner();
+                println!("{:#?}", resp);
+            }
+            Cmd::Unfreeze { id } => {
+                let resp = client.unfreeze_account(UnfreezeAccountRequest { id: id.as_bytes().to_vec() }).await?.into_inner();
                 println!("{:#?}", resp);
             }
         }
