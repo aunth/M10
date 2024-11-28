@@ -119,6 +119,24 @@ impl protos::ledger_server::Ledger for Ledger {
             .get(&to_id)
             .ok_or_else(|| Status::not_found("account not found"))?;
 
+        if from_account.is_frozen {
+            return Ok(tonic::Response::new(TransferResult {
+                error: Some(TransferError {
+                    code: transfer_error::Code::FrozenAccount.into(),
+                    message: "Source account is frozen".to_string(),
+                }),
+            }));
+        }
+
+        if to_account.is_frozen {
+            return Ok(tonic::Response::new(TransferResult {
+                error: Some(TransferError {
+                    code: transfer_error::Code::FrozenAccount.into(),
+                    message: "Target account is frozen".to_string(),
+                }),
+            }));
+        }
+
         let Some(new_from_balance) = from_account.balance.checked_sub(request.amount) else {
             return Ok(tonic::Response::new(TransferResult {
                 error: Some(TransferError {
