@@ -6,6 +6,7 @@ message Transfer {
   bytes from_account = 1;
   bytes to_account = 2;
   uint64 amount = 3;
+  bytes signature = 4;
 }
 
 message TransferError {
@@ -57,8 +58,13 @@ message UnfreezeAccountResponse {
   string message = 2;
 }
 
+message CreateAccountResponse {
+  Account account = 1;
+  bytes private_key = 2;
+}
+
 service Ledger {
-  rpc CreateAccount(CreateAccountReq) returns (Account) {}
+  rpc CreateAccount(CreateAccountReq) returns (CreateAccountResponse) {}
   rpc GetAccount(GetAccountReq) returns (Account) {}
 
   rpc CreateTransfer(Transfer) returns (TransferResult) {}

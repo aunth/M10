@@ -1,9 +1,11 @@
 use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
-use protos::{ledger_server::LedgerServer, transfer_error, Account, TransferError, TransferResult};
+use protos::{ledger_server::LedgerServer, transfer_error, Account, CreateAccountReq, CreateAccountResponse, GetAccountReq, TransferError, TransferResult};
 use tokio::sync::Mutex;
-use tonic::{transport::Server, Status};
+use tonic::{transport::Server, Status, Request, Response};
 use uuid::Uuid;
+use rand::rngs::OsRng;
+use secp256k1::{Secp256k1};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Default, Clone)]
 struct Ledger {
-    accounts: Arc<Mutex<HashMap<uuid::Uuid, Account>>>,
+    accounts: Arc<Mutex<HashMap<Vec<u8>, Account>>>,
 }
 
 #[async_trait]
@@ -32,7 +34,7 @@ impl protos::ledger_server::Ledger for Ledger {
         let id = Uuid::from_slice(&request.id)
             .map_err(|err| tonic::Status::invalid_argument(format!("{}", err)))?;
         let mut accounts = self.accounts.lock().await;
-        let account = accounts.get_mut(&id).ok_or_else(|| Status::not_found("account not found"))?;
+        let account = accounts.get_mut(&id.as_bytes().to_vec()).ok_or_else(|| Status::not_found("account not found"))?;
         if account.is_frozen {
             return Ok(tonic::Response::new(protos::FreezeAccountResponse {
                 success: false,
@@ -54,7 +56,7 @@ impl protos::ledger_server::Ledger for Ledger {
         let id = Uuid::from_slice(&request.id)
             .map_err(|err| tonic::Status::invalid_argument(format!("{}", err)))?;
         let mut accounts = self.accounts.lock().await;
-        let account = accounts.get_mut(&id).ok_or_else(|| Status::not_found("account not found"))?;
+        let account = accounts.get_mut(&id.as_bytes().to_vec()).ok_or_else(|| Status::not_found("account not found"))?;
         if !account.is_frozen {
             return Ok(tonic::Response::new(protos::UnfreezeAccountResponse {
                 success: false,
@@ -70,34 +72,45 @@ impl protos::ledger_server::Ledger for Ledger {
 
     async fn create_account(
         &self,
-        request: tonic::Request<protos::CreateAccountReq>,
-    ) -> Result<tonic::Response<protos::Account>, tonic::Status> {
-        let request = request.into_inner();
-        let id = Uuid::new_v4();
-        let mut accounts = self.accounts.lock().await;
+        request: Request<CreateAccountReq>,
+    ) -> Result<Response<CreateAccountResponse>, Status> {
+        let req = request.into_inner();
+        
+        // Generate keypair
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+        
         let account = Account {
-            name: request.name,
-            balance: request.balance,
-            id: id.as_bytes().to_vec(),
+            id: public_key.serialize().to_vec(),
+            name: req.name,
+            balance: req.balance,
             is_frozen: false,
         };
-        accounts.insert(id, account.clone());
-        Ok(tonic::Response::new(account))
+
+        let mut accounts = self.accounts.lock().await;
+        accounts.insert(
+            account.id.clone(), 
+            account.clone()
+        );
+
+        Ok(Response::new(CreateAccountResponse {
+            account: Some(account),
+            private_key: secret_key.secret_bytes().to_vec(),
+        }))
     }
 
     async fn get_account(
         &self,
-        request: tonic::Request<protos::GetAccountReq>,
-    ) -> Result<tonic::Response<protos::Account>, tonic::Status> {
-        let request = request.into_inner();
-        let id = Uuid::from_slice(&request.id)
-            .map_err(|err| tonic::Status::invalid_argument(format!("{}", err)))?;
+        request: Request<GetAccountReq>,
+    ) -> Result<Response<Account>, Status> {
+        let req = request.into_inner();
         let accounts = self.accounts.lock().await;
-        let account = accounts
-            .get(&id)
-            .ok_or_else(|| Status::not_found("account not found"))?
-            .clone();
-        Ok(tonic::Response::new(account))
+        
+        accounts
+            .get(&req.id)
+            .cloned()
+            .ok_or_else(|| Status::not_found("Account not found"))
+            .map(Response::new)
     }
 
     async fn create_transfer(
@@ -112,11 +125,11 @@ impl protos::ledger_server::Ledger for Ledger {
 
         let mut accounts = self.accounts.lock().await;
         let from_account = accounts
-            .get(&from_id)
+            .get(&from_id.as_bytes().to_vec())
             .ok_or_else(|| Status::not_found("account not found"))?;
 
         let to_account = accounts
-            .get(&to_id)
+            .get(&to_id.as_bytes().to_vec())
             .ok_or_else(|| Status::not_found("account not found"))?;
 
         if from_account.is_frozen {
@@ -155,12 +168,12 @@ impl protos::ledger_server::Ledger for Ledger {
 
         };
         let from_account = accounts
-            .get_mut(&from_id)
+            .get_mut(&from_id.as_bytes().to_vec())
             .ok_or_else(|| Status::not_found("account not found"))?;
         from_account.balance = new_from_balance;
 
         let to_account = accounts
-            .get_mut(&to_id)
+            .get_mut(&to_id.as_bytes().to_vec())
             .ok_or_else(|| Status::not_found("account not found"))?;
         to_account.balance = new_to_balance;
         Ok(tonic::Response::new(TransferResult { error: None }))

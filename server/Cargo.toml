@@ -12,3 +12,6 @@ prost = "0.8"
 protos = { path = "../protos" }
 tonic = "0.5"
 tokio = { version = "1.2", features = ["full"] }
+secp256k1 = { version = "0.27.0", features = ["rand-std"] }
+rand = "0.8"
+hex = "0.4.3"

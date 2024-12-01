@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
 use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer, FreezeAccountRequest, UnfreezeAccountRequest};
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -41,9 +40,10 @@ impl Cmd {
                     .create_account(CreateAccountReq { name, balance })
                     .await?
                     .into_inner();
-                println!("id: {}", Uuid::from_slice(&resp.id)?);
-                println!("name: {}", resp.name);
-                println!("balance: {}", resp.balance);
+                println!("id: {}", hex::encode(&resp.account.as_ref().unwrap().id));
+                println!("name: {}", resp.account.as_ref().unwrap().name);
+                println!("balance: {}", resp.account.as_ref().unwrap().balance);
+                println!("private_key: {}", hex::encode(resp.private_key));
             }
             Cmd::Get { id } => {
                 let resp = client
@@ -60,6 +60,7 @@ impl Cmd {
                         from_account: from.as_bytes().to_vec(),
                         to_account: to.as_bytes().to_vec(),
                         amount,
+                        signature: vec![],
                     })
                     .await?
                     .into_inner();
