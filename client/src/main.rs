@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer, FreezeAccountRequest, UnfreezeAccountRequest, Account};
+use hex;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,10 +25,10 @@ enum Cmd {
         amount: u64,
     },
     Freeze {
-        id: uuid::Uuid,
+        id: String,
     },
     Unfreeze {
-        id: uuid::Uuid,
+        id: String,
     },
 }
 
@@ -67,11 +68,11 @@ impl Cmd {
                 println!("{:#?}", resp);
             }
             Cmd::Freeze { id } => {
-                let resp = client.freeze_account(FreezeAccountRequest { id: id.as_bytes().to_vec() }).await?.into_inner();
+                let resp = client.freeze_account(FreezeAccountRequest { id: hex::decode(id).unwrap() }).await?.into_inner();
                 println!("{:#?}", resp);
             }
             Cmd::Unfreeze { id } => {
-                let resp = client.unfreeze_account(UnfreezeAccountRequest { id: id.as_bytes().to_vec() }).await?.into_inner();
+                let resp = client.unfreeze_account(UnfreezeAccountRequest { id: hex::decode(id).unwrap() }).await?.into_inner();
                 println!("{:#?}", resp);
             }
         }

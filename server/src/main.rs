@@ -32,10 +32,9 @@ impl protos::ledger_server::Ledger for Ledger {
         request: tonic::Request<protos::FreezeAccountRequest>,
     ) -> Result<tonic::Response<protos::FreezeAccountResponse>, tonic::Status> {
         let request = request.into_inner();
-        let id = Uuid::from_slice(&request.id)
-            .map_err(|err| tonic::Status::invalid_argument(format!("{}", err)))?;
+        let id = request.id;
         let mut accounts = self.accounts.lock().await;
-        let account = accounts.get_mut(&id.as_bytes().to_vec()).ok_or_else(|| Status::not_found("account not found"))?;
+        let account = accounts.get_mut(&id).ok_or_else(|| Status::not_found("account not found"))?;
         if account.is_frozen {
             return Ok(tonic::Response::new(protos::FreezeAccountResponse {
                 success: false,
@@ -54,10 +53,9 @@ impl protos::ledger_server::Ledger for Ledger {
         request: tonic::Request<protos::UnfreezeAccountRequest>,
     ) -> Result<tonic::Response<protos::UnfreezeAccountResponse>, tonic::Status> {
         let request = request.into_inner();
-        let id = Uuid::from_slice(&request.id)
-            .map_err(|err| tonic::Status::invalid_argument(format!("{}", err)))?;
+        let id = request.id;
         let mut accounts = self.accounts.lock().await;
-        let account = accounts.get_mut(&id.as_bytes().to_vec()).ok_or_else(|| Status::not_found("account not found"))?;
+        let account = accounts.get_mut(&id).ok_or_else(|| Status::not_found("account not found"))?;
         if !account.is_frozen {
             return Ok(tonic::Response::new(protos::UnfreezeAccountResponse {
                 success: false,
