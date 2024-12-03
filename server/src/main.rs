@@ -6,6 +6,7 @@ use tonic::{transport::Server, Status, Request, Response};
 use uuid::Uuid;
 use rand::rngs::OsRng;
 use secp256k1::{Secp256k1};
+use hex;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

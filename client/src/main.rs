@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer, FreezeAccountRequest, UnfreezeAccountRequest};
+use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer, FreezeAccountRequest, UnfreezeAccountRequest, Account};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,7 +16,7 @@ enum Cmd {
         balance: u64,
     },
     Get {
-        id: uuid::Uuid,
+        id: String,
     },
     Transfer {
         from: uuid::Uuid,
@@ -48,11 +48,11 @@ impl Cmd {
             Cmd::Get { id } => {
                 let resp = client
                     .get_account(GetAccountReq {
-                        id: id.as_bytes().to_vec(),
+                        id: hex::decode(&id).unwrap(),
                     })
                     .await?
                     .into_inner();
-                println!("{:#?}", resp);
+                display_account(&resp);
             }
             Cmd::Transfer { from, to, amount } => {
                 let resp = client
@@ -77,4 +77,13 @@ impl Cmd {
         }
         Ok(())
     }
+}
+
+fn display_account(account: &Account) {
+    println!("Account {{");
+    println!("    id: {}", hex::encode(&account.id));
+    println!("    name: \"{}\"", account.name);
+    println!("    balance: {}", account.balance);
+    println!("    is_frozen: {}", account.is_frozen);
+    println!("}}");
 }
