@@ -16,6 +16,9 @@ message TransferError {
       UNKNOWN = 0;
       INSUFFICIENT_BALANCE = 1;
       FROZEN_ACCOUNT = 2;
+      INVALID_SIGNATURE = 3;
+      ACCOUNT_NOT_FOUND = 4;
+      BALANCE_OVERFLOW = 5;
     }
 }
 

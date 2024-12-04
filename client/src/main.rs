@@ -1,7 +1,11 @@
+use std::process::exit;
+
 use anyhow::Result;
 use clap::Parser;
 use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer, FreezeAccountRequest, UnfreezeAccountRequest, Account};
 use hex;
+use secp256k1::{SecretKey, Secp256k1, Message};
+use sha2::{Sha256, Digest};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,9 +24,10 @@ enum Cmd {
         id: String,
     },
     Transfer {
-        from: uuid::Uuid,
-        to: uuid::Uuid,
+        from: String,
+        to: String,
         amount: u64,
+        private_key: String,
     },
     Freeze {
         id: String,
@@ -31,6 +36,7 @@ enum Cmd {
         id: String,
     },
 }
+
 
 impl Cmd {
     async fn exec(self) -> Result<()> {
@@ -55,18 +61,45 @@ impl Cmd {
                     .into_inner();
                 display_account(&resp);
             }
-            Cmd::Transfer { from, to, amount } => {
+            Cmd::Transfer { from, to, amount, private_key } => {
+                let mut message = Vec::new();
+                message.extend_from_slice(&hex::decode(&from).unwrap());
+                message.extend_from_slice(&hex::decode(&to).unwrap());
+                message.extend_from_slice(&amount.to_le_bytes());
+            
+                let secp = Secp256k1::new();
+
+                let message_hash = Sha256::digest(&message);
+            
+                let secret_key = match hex::decode(&private_key) {
+                    Ok(decoded) => SecretKey::from_slice(&decoded).unwrap_or_else(|e| {
+                        println!("Invalid private key: {}", e);
+                        exit(1);
+                    }),
+                    Err(err) => {
+                        println!("Invalid private key: {}", err);
+                        exit(1);
+                    }
+                };
+            
+                let message_hash = Message::from_digest_slice(&message_hash)
+                    .map_err(|e| println!("Failed to create message hash: {}", e));
+            
+                let signature = secp.sign_ecdsa(&message_hash.unwrap(), &secret_key);
+            
                 let resp = client
                     .create_transfer(Transfer {
-                        from_account: from.as_bytes().to_vec(),
-                        to_account: to.as_bytes().to_vec(),
+                        from_account: hex::decode(&from).unwrap(),
+                        to_account: hex::decode(&to).unwrap(),
                         amount,
-                        signature: vec![],
+                        signature: signature.serialize_compact().to_vec(),
                     })
                     .await?
                     .into_inner();
-                println!("{:#?}", resp);
+            
+                println!("Transfer response: {:#?}", resp);
             }
+            
             Cmd::Freeze { id } => {
                 let resp = client.freeze_account(FreezeAccountRequest { id: hex::decode(id).unwrap() }).await?.into_inner();
                 println!("{:#?}", resp);
@@ -88,3 +121,4 @@ fn display_account(account: &Account) {
     println!("    is_frozen: {}", account.is_frozen);
     println!("}}");
 }
+
