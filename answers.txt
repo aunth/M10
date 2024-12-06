@@ -1,0 +1,18 @@
+
+My notes to the M10 tasks
+
+1. To add the ability to "freeze" an account first i changed service ledger and add to it 2 new procedures
+FreezeAccount and UnfreezeAccount. Also added realization of request and response for each operation.
+Interface is very simple, we just need to run (freeze account_id) to freeze some account. When we do it, in account
+message we change field is_frozen and after that we cannot use this account in transactions. 
+If we do it we get FROZEN_ACCOUNT error in transaction.
+
+2. In this task i decided to add signature to verify the transaction. For each account we need 2 keys public
+and private, so i changed form of creation of id, now id in account message is his public key. And we generate 
+private key and send it to a user(we also could implement storing of this private key in some file on client),
+but for simplicity we just print it to a user. Then we changed transfer message and add to it a signature field
+to validate the transaction. And on the server when we get a transfer, we create message hash, then we verify
+wether passed private key was correct using public key, message hash and signature. And then make a transfer of 
+the money
+
+
