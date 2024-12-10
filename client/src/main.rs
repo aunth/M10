@@ -1,8 +1,8 @@
-use std::process::exit;
+use std::{process::exit, u64};
 
 use anyhow::Result;
 use clap::Parser;
-use protos::{ledger_client::LedgerClient, CreateAccountReq, GetAccountReq, Transfer, FreezeAccountRequest, UnfreezeAccountRequest, Account};
+use protos::{ledger_client::LedgerClient, Account, CreateAccountReq, FreezeAccountRequest, GetAccountReq, GetHistoryRequest, Transfer, UnfreezeAccountRequest};
 use hex;
 use secp256k1::{SecretKey, Secp256k1, Message};
 use sha2::{Sha256, Digest};
@@ -35,6 +35,10 @@ enum Cmd {
     Unfreeze {
         id: String,
     },
+    GetHistory {
+        id: String,
+        limit: Option<u64>
+    }
 }
 
 
@@ -105,7 +109,15 @@ impl Cmd {
                 println!("{:#?}", resp);
             }
             Cmd::Unfreeze { id } => {
-                let resp = client.unfreeze_account(UnfreezeAccountRequest { id: hex::decode(id).unwrap() }).await?.into_inner();
+                let resp = client.unfreeze_account(UnfreezeAccountRequest { 
+                    id: hex::decode(id).unwrap() 
+                }).await?.into_inner();
+                println!("{:#?}", resp);
+            }
+            Cmd::GetHistory { id, limit } => {
+                let resp = client.get_history( GetHistoryRequest {
+                    id: hex::decode(id).unwrap(), limit: limit.unwrap_or(u64::MAX)
+                }).await?.into_inner();
                 println!("{:#?}", resp);
             }
         }

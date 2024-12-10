@@ -1,15 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use protos::{
-    ledger_server::LedgerServer, Account, CreateAccountReq, CreateAccountResponse, GetAccountReq,
-    Transfer, TransferResult, TransferError, transfer_error, GetHistoryRequest, GetHistoryResponse,
-    FreezeAccountRequest, FreezeAccountResponse, UnfreezeAccountRequest, UnfreezeAccountResponse
+    action::ActionType, ledger_server::LedgerServer, transfer_error, Account, Action, CreateAccountReq, CreateAccountResponse, FreezeAccountRequest, FreezeAccountResponse, GetAccountReq, GetHistoryRequest, GetHistoryResponse, Transfer, TransferError, TransferResult, UnfreezeAccountRequest, UnfreezeAccountResponse
 };
 use tokio::sync::Mutex;
 use tonic::{transport::Server, Status, Request, Response};
 use rand::rngs::OsRng;
 use secp256k1::{Secp256k1, PublicKey, Message, ecdsa::Signature};
 use sha2::{Sha256, Digest};
+use std::time::{SystemTime, UNIX_EPOCH}; 
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,9 +22,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+
+fn get_current_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs()
+}
+
+fn get_null_account() -> Vec<u8> {
+    vec![0u8, 32]
+}
+
 #[derive(Default, Clone)]
 struct Ledger {
     accounts: Arc<Mutex<HashMap<Vec<u8>, Account>>>,
+    history: Arc<Mutex<Vec<Action>>>
 }
 
 #[async_trait]
@@ -45,6 +57,13 @@ impl protos::ledger_server::Ledger for Ledger {
             }));
         }
         account.is_frozen = true;
+        let mut history = self.history.lock().await;
+        history.push(Action { 
+            r#type: ActionType::FreezeAccount.into(),
+            timestamp: get_current_timestamp(), 
+            from: get_null_account(), 
+            to: id, 
+        });
         Ok(tonic::Response::new(protos::FreezeAccountResponse {
             success: true,
             message: "Account has been frozen".to_string(),
@@ -60,13 +79,22 @@ impl protos::ledger_server::Ledger for Ledger {
         let mut accounts = self.accounts.lock().await;
         let account = accounts.get_mut(&id).ok_or_else(|| Status::not_found("Account not found"))?;
         if !account.is_frozen {
-            return Ok(tonic::Response::new(protos::UnfreezeAccountResponse {
+            return Ok(Response::new(UnfreezeAccountResponse {
                 success: false,
                 message: "Account is not frozen".to_string(),
             }));
         }
         account.is_frozen = false;
-        Ok(tonic::Response::new(protos::UnfreezeAccountResponse {
+
+        let mut history = self.history.lock().await;
+        history.push(Action { 
+            r#type: ActionType::UnfreezeAccount.into(),
+            timestamp: get_current_timestamp(), 
+            from: get_null_account(), 
+            to: id, 
+        });
+
+        Ok(Response::new(UnfreezeAccountResponse {
             success: true,
             message: "Account has been unfrozen".to_string(),
         }))
@@ -93,6 +121,14 @@ impl protos::ledger_server::Ledger for Ledger {
             account.id.clone(), 
             account.clone()
         );
+
+        let mut history = self.history.lock().await;
+        history.push(Action { 
+            r#type: ActionType::CreateAccount.into(),
+            timestamp: get_current_timestamp(), 
+            from: get_null_account(), 
+            to: account.id.clone(), 
+        });
 
         Ok(Response::new(CreateAccountResponse {
             account: Some(account),
@@ -140,6 +176,14 @@ impl protos::ledger_server::Ledger for Ledger {
             }))
         }
 
+        let mut history = self.history.lock().await;
+        history.push(Action { 
+            r#type: ActionType::Transfer.into(),
+            timestamp: get_current_timestamp(), 
+            from: from_account.id, 
+            to: to_account.id, 
+        });
+
         Ok(Response::new(TransferResult {
             error: None,
         }))
@@ -149,8 +193,23 @@ impl protos::ledger_server::Ledger for Ledger {
         &self, 
         request: Request<GetHistoryRequest>
     ) -> Result<Response<GetHistoryResponse>, Status> {
+
+        let req = request.into_inner();
+
+        let id = req.id;
+        let limit = req.limit;
+
+        let history = self.history.lock().await;
+
+        let result: Vec<_> = history.iter() 
+        .filter(|x| x.from == id || x.to == id)
+        .take(limit as usize)
+        .cloned()
+        .collect();
+        
+
         Ok(Response::new(GetHistoryResponse {
-            actions: vec![],
+            actions: result,
         }))
     }
 }
