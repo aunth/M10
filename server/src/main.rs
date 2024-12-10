@@ -2,7 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use protos::{
     ledger_server::LedgerServer, Account, CreateAccountReq, CreateAccountResponse, GetAccountReq,
-    Transfer, TransferResult, TransferError, transfer_error
+    Transfer, TransferResult, TransferError, transfer_error, GetHistoryRequest, GetHistoryResponse,
+    FreezeAccountRequest, FreezeAccountResponse, UnfreezeAccountRequest, UnfreezeAccountResponse
 };
 use tokio::sync::Mutex;
 use tonic::{transport::Server, Status, Request, Response};
@@ -31,8 +32,8 @@ struct Ledger {
 impl protos::ledger_server::Ledger for Ledger {
     async fn freeze_account(
         &self,
-        request: tonic::Request<protos::FreezeAccountRequest>,
-    ) -> Result<tonic::Response<protos::FreezeAccountResponse>, tonic::Status> {
+        request: Request<FreezeAccountRequest>,
+    ) -> Result<Response<FreezeAccountResponse>, Status> {
         let request = request.into_inner();
         let id = request.id;
         let mut accounts = self.accounts.lock().await;
@@ -52,8 +53,8 @@ impl protos::ledger_server::Ledger for Ledger {
 
     async fn unfreeze_account(
         &self,
-        request: tonic::Request<protos::UnfreezeAccountRequest>,
-    ) -> Result<tonic::Response<protos::UnfreezeAccountResponse>, tonic::Status> {
+        request: Request<UnfreezeAccountRequest>,
+    ) -> Result<Response<UnfreezeAccountResponse>, Status> {
         let request = request.into_inner();
         let id = request.id;
         let mut accounts = self.accounts.lock().await;
@@ -141,6 +142,15 @@ impl protos::ledger_server::Ledger for Ledger {
 
         Ok(Response::new(TransferResult {
             error: None,
+        }))
+    }
+
+    async fn get_history(
+        &self, 
+        request: Request<GetHistoryRequest>
+    ) -> Result<Response<GetHistoryResponse>, Status> {
+        Ok(Response::new(GetHistoryResponse {
+            actions: vec![],
         }))
     }
 }

@@ -9,6 +9,30 @@ message Transfer {
   bytes signature = 4;
 }
 
+message Action {
+  ActionType type = 1;
+  uint64 timestamp = 2;
+  bytes from = 3;
+  bytes to = 4;
+
+  enum ActionType {
+    TRANSFER = 0;
+    CREATE_ACCOUNT = 1;
+    FREEZE_ACCOUNT = 2;
+    UNFREEZE_ACCOUNT = 3;
+  }
+}
+
+message GetHistoryRequest {
+  bytes id = 1;
+  uint64 limit = 2;
+}
+
+message GetHistoryResponse {
+  repeated Action actions = 1;
+}
+
+
 message TransferError {
   Code code = 1;
   string message = 2;
@@ -73,4 +97,5 @@ service Ledger {
   rpc CreateTransfer(Transfer) returns (TransferResult) {}
   rpc FreezeAccount(FreezeAccountRequest) returns (FreezeAccountResponse) {}
   rpc UnfreezeAccount(UnfreezeAccountRequest) returns (UnfreezeAccountResponse) {}
+  rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse) {}
 }
