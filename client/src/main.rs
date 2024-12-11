@@ -2,7 +2,9 @@ use std::{process::exit, u64};
 
 use anyhow::Result;
 use clap::Parser;
-use protos::{ledger_client::LedgerClient, Account, CreateAccountReq, FreezeAccountRequest, GetAccountReq, GetHistoryRequest, Transfer, UnfreezeAccountRequest};
+use protos::{ledger_client::LedgerClient, Account, Action, CreateAccountReq, FreezeAccountRequest, GetAccountReq, 
+    GetHistoryRequest, Transfer, UnfreezeAccountRequest};
+use protos::action::ActionType;
 use hex;
 use secp256k1::{SecretKey, Secp256k1, Message};
 use sha2::{Sha256, Digest};
@@ -118,11 +120,34 @@ impl Cmd {
                 let resp = client.get_history( GetHistoryRequest {
                     id: hex::decode(id).unwrap(), limit: limit.unwrap_or(u64::MAX)
                 }).await?.into_inner();
-                println!("{:#?}", resp);
+                for (index, i) in resp.actions.iter().enumerate() {
+                    println!("--------------------------");
+                    println!("Index: {}", index+1);
+                    display_action(i);
+                    println!("--------------------------");
+                }
             }
         }
         Ok(())
     }
+}
+
+fn action_from_u32(value: i32) -> Option<ActionType>{
+    match value {
+        0 => Some(ActionType::Transfer),
+        1 => Some(ActionType::CreateAccount),
+        2 => Some(ActionType::FreezeAccount),
+        3 => Some(ActionType::UnfreezeAccount),
+        _ => None
+    }
+}
+
+fn display_action(action: &Action) {
+    println!("Aciton type: {:?}", action_from_u32(action.r#type).unwrap());
+    println!("Timestamp: {}", action.timestamp);
+    println!("From id: {}", hex::encode(action.from.clone()));
+    println!("To id: {}", hex::encode(action.to.clone()));
+    println!("Amount: {}", action.sum);
 }
 
 fn display_account(account: &Account) {

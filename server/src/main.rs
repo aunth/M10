@@ -31,7 +31,7 @@ fn get_current_timestamp() -> u64 {
 }
 
 fn get_null_account() -> Vec<u8> {
-    vec![0u8, 32]
+    vec![0u8; 32]
 }
 
 #[derive(Default, Clone)]
@@ -63,6 +63,7 @@ impl protos::ledger_server::Ledger for Ledger {
             timestamp: get_current_timestamp(), 
             from: get_null_account(), 
             to: id, 
+            sum: 0,
         });
         Ok(tonic::Response::new(protos::FreezeAccountResponse {
             success: true,
@@ -92,6 +93,7 @@ impl protos::ledger_server::Ledger for Ledger {
             timestamp: get_current_timestamp(), 
             from: get_null_account(), 
             to: id, 
+            sum: 0,
         });
 
         Ok(Response::new(UnfreezeAccountResponse {
@@ -128,6 +130,7 @@ impl protos::ledger_server::Ledger for Ledger {
             timestamp: get_current_timestamp(), 
             from: get_null_account(), 
             to: account.id.clone(), 
+            sum: 0,
         });
 
         Ok(Response::new(CreateAccountResponse {
@@ -182,6 +185,7 @@ impl protos::ledger_server::Ledger for Ledger {
             timestamp: get_current_timestamp(), 
             from: from_account.id, 
             to: to_account.id, 
+            sum: transfer.amount,
         });
 
         Ok(Response::new(TransferResult {
