@@ -44,6 +44,7 @@ message TransferError {
       INVALID_SIGNATURE = 3;
       ACCOUNT_NOT_FOUND = 4;
       BALANCE_OVERFLOW = 5;
+      INVALID_ADDRESS = 6;
     }
 }
 

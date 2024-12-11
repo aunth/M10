@@ -15,4 +15,31 @@ to validate the transaction. And on the server when we get a transfer, we create
 wether passed private key was correct using public key, message hash and signature. And then make a transfer of 
 the money
 
+3. For the third task, I decided to implement an action history feature. The idea behind this feature is that, for any ledger system,
+it's important to track and know the details of past transactions. Specifically, when and how much money was transferred, and to whom.
+
+Changes in the .proto File
+To start, I modified the .proto file by adding three new messages: GetHistoryRequest, GetHistoryResponse, and Action. 
+These messages are used to request and return historical action data.
+
+How It Works
+To interact with the new functionality, you can run the program with the following command:
+cargo run get-history user_public_key limit
+If you don't specify a limit, the program will return the full transaction history for the provided user.
+
+Client-Side Implementation
+On the client side, the public_key is decoded into bytes. For the limit, we check if the user has specified one. 
+If not, we pass the maximum possible u64 value, which essentially means no limit. We then call GetHistoryRequest(public_key_bytes, limit) 
+and wait for a response. Once the response is received, we loop through the resp.actions array and display each action.
+
+Server-Side Implementation
+On the server, I updated the Ledger struct by adding a new field, actions, which is an array of Action structs. 
+The get_history function processes the request by filtering the history array for actions where the from or to fields match 
+the provided user ID. It then returns the first limit actions to the client.
+
+Issues and Improvements
+While the implementation works, it's not optimal. Currently, we store all actions in a vector in memory, 
+which can quickly become problematic when dealing with many users and large histories, potentially leading to memory issues. 
+A much better approach would be to store this data in a database, such as MongoDB or a relational database, which would be more 
+scalable and efficient for handling large amounts of data.
 

@@ -59,72 +59,125 @@ impl Cmd {
                 println!("private_key: {}", hex::encode(resp.private_key));
             }
             Cmd::Get { id } => {
-                let resp = client
-                    .get_account(GetAccountReq {
-                        id: hex::decode(&id).unwrap(),
-                    })
-                    .await?
-                    .into_inner();
-                display_account(&resp);
+                let decoded_id = hex::decode(&id);
+                match decoded_id {
+                    Ok(decoded) => {
+                        let resp = client
+                            .get_account(GetAccountReq { id: decoded })
+                            .await?
+                            .into_inner();
+                        display_account(&resp);
+                    },
+                    Err(_) => {
+                        println!("Error: Invalid ID format. The ID should be a valid hexadecimal string.");
+                    }
+                }
             }
             Cmd::Transfer { from, to, amount, private_key } => {
-                let mut message = Vec::new();
-                message.extend_from_slice(&hex::decode(&from).unwrap());
-                message.extend_from_slice(&hex::decode(&to).unwrap());
-                message.extend_from_slice(&amount.to_le_bytes());
-            
-                let secp = Secp256k1::new();
+                let from_decoded = match hex::decode(&from) {
+                    Ok(decoded) => decoded,
+                    Err(_) => {
+                        println!("Error: Invalid 'from' address. Expected a valid hex string.");
+                        return Ok(());
+                    }
+                };
 
+                let to_decoded = match hex::decode(&to) {
+                    Ok(decoded) => decoded,
+                    Err(_) => {
+                        println!("Error: Invalid 'to' address. Expected a valid hex string.");
+                        return Ok(());
+                    }
+                };
+
+                let mut message = Vec::new();
+                message.extend_from_slice(&from_decoded);
+                message.extend_from_slice(&to_decoded);
+                message.extend_from_slice(&amount.to_le_bytes());
+
+                let secp = Secp256k1::new();
                 let message_hash = Sha256::digest(&message);
-            
+
                 let secret_key = match hex::decode(&private_key) {
                     Ok(decoded) => SecretKey::from_slice(&decoded).unwrap_or_else(|e| {
-                        println!("Invalid private key: {}", e);
+                        println!("Error: Invalid private key: {}", e);
                         exit(1);
                     }),
                     Err(err) => {
-                        println!("Invalid private key: {}", err);
+                        println!("Error: Invalid private key format: {}", err);
                         exit(1);
                     }
                 };
-            
+
                 let message_hash = Message::from_digest_slice(&message_hash)
-                    .map_err(|e| println!("Failed to create message hash: {}", e));
-            
-                let signature = secp.sign_ecdsa(&message_hash.unwrap(), &secret_key);
-            
+                    .map_err(|e| {
+                        println!("Error: Failed to create message hash: {}", e);
+                    })
+                    .unwrap();
+
+                let signature = secp.sign_ecdsa(&message_hash, &secret_key);
+
                 let resp = client
                     .create_transfer(Transfer {
-                        from_account: hex::decode(&from).unwrap(),
-                        to_account: hex::decode(&to).unwrap(),
+                        from_account: from_decoded,
+                        to_account: to_decoded,
                         amount,
                         signature: signature.serialize_compact().to_vec(),
                     })
                     .await?
                     .into_inner();
-            
+
                 println!("Transfer response: {:#?}", resp);
             }
             
             Cmd::Freeze { id } => {
-                let resp = client.freeze_account(FreezeAccountRequest { id: hex::decode(id).unwrap() }).await?.into_inner();
-                println!("{:#?}", resp);
+                let decoded_id = hex::decode(&id);
+                match decoded_id {
+                    Ok(decoded) => {
+                        let resp = client.freeze_account(FreezeAccountRequest { id: decoded }).await?.into_inner();
+                        println!("{:#?}", resp);
+                    },
+                    Err(_) => {
+                        println!("Error: Invalid ID format. The ID should be a valid hexadecimal string.");
+                    }
+                }
             }
             Cmd::Unfreeze { id } => {
-                let resp = client.unfreeze_account(UnfreezeAccountRequest { 
-                    id: hex::decode(id).unwrap() 
-                }).await?.into_inner();
-                println!("{:#?}", resp);
+                let decoded_id = hex::decode(&id);
+                match decoded_id {
+                    Ok(decoded) => {
+                        let resp = client.unfreeze_account(UnfreezeAccountRequest { id: decoded }).await?.into_inner();
+                        println!("{:#?}", resp);
+                    },
+                    Err(_) => {
+                        println!("Error: Invalid ID format. The ID should be a valid hexadecimal string.");
+                    }
+                }
             }
             Cmd::GetHistory { id, limit } => {
-                let resp = client.get_history( GetHistoryRequest {
-                    id: hex::decode(id).unwrap(), limit: limit.unwrap_or(u64::MAX)
-                }).await?.into_inner();
-                for (index, i) in resp.actions.iter().enumerate() {
-                    println!("--------------------------");
-                    println!("Index: {}", index+1);
-                    display_action(i);
-                    println!("--------------------------");
+                let decoded_id = hex::decode(&id);
+                match decoded_id {
+                    Ok(decoded) => {
+                        let resp = client.get_history(GetHistoryRequest {
+                            id: decoded,
+                            limit: limit.unwrap_or(u64::MAX),
+                        }).await?.into_inner();
+
+                        if resp.actions.len() < 1 {
+                            println!("Account not found");
+                            return Ok(());
+                        }
+                        
+                        for (index, i) in resp.actions.iter().enumerate() {
+                            println!("--------------------------");
+                            println!("Index: {}", index + 1);
+                            display_action(i);
+                            println!("--------------------------");
+                        }
+                    },
+                    Err(_) => {
+                        println!("Error: Invalid ID format. The ID should be a valid hexadecimal string.");
+                    }
                 }
             }
         }
