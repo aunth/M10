@@ -224,6 +224,7 @@ impl Ledger {
         message.extend_from_slice(&transfer.from_account);
         message.extend_from_slice(&transfer.to_account);
         message.extend_from_slice(&transfer.amount.to_le_bytes());
+        message.extend_from_slice(&transfer.nonce.to_le_bytes());
         Ok(Sha256::digest(&message).into())
     }
 

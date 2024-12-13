@@ -8,6 +8,7 @@ use protos::action::ActionType;
 use hex;
 use secp256k1::{SecretKey, Secp256k1, Message};
 use sha2::{Sha256, Digest};
+use rand::Rng;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -90,10 +91,14 @@ impl Cmd {
                     }
                 };
 
+                let mut rng = rand::thread_rng();
+                let nonce_decoded: u64 = rng.gen();
+
                 let mut message = Vec::new();
                 message.extend_from_slice(&from_decoded);
                 message.extend_from_slice(&to_decoded);
                 message.extend_from_slice(&amount.to_le_bytes());
+                message.extend_from_slice(&nonce_decoded.to_le_bytes());
 
                 let secp = Secp256k1::new();
                 let message_hash = Sha256::digest(&message);
@@ -123,6 +128,7 @@ impl Cmd {
                         to_account: to_decoded,
                         amount,
                         signature: signature.serialize_compact().to_vec(),
+                        nonce: nonce_decoded
                     })
                     .await?
                     .into_inner();

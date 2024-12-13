@@ -17,3 +17,4 @@ clap =  { version = "4", features = ["derive"] }
 hex = "0.4"
 secp256k1 = { version = "0.28.0", features = ["rand", "rand-std"] }
 sha2 = "0.10"
+rand = "0.8"
